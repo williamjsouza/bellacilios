@@ -1,10 +1,10 @@
 ### OpenLiteSpeed / aaPanel - Reverse Proxy para Next.js
-### Caso utilize o arquivo .htaccess, estas regras encaminham as requisições para a porta 3000
+### Regras de reescrita encaminhando as requisições para a porta 3020
 
 RewriteEngine On
 
 # Não intercepta requisições de renovação de SSL Let's Encrypt
 RewriteCond %{REQUEST_URI} !^/\.well-known/
 
-# Encaminha todo o tráfego para a aplicação Next.js no PM2 (porta 3000)
-RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
+# Encaminha todo o tráfego para a aplicação Next.js no PM2 (porta 3020)
+RewriteRule ^(.*)$ http://127.0.0.1:3020/$1 [P,L]
