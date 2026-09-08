@@ -76,7 +76,7 @@ export default function ClientDetail({ clientId, onBack, onEdit }: { clientId: s
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => {
             const url = `${window.location.origin}/anamnese/${c.id}`
-            navigator.clipboard.writeText(url)
+            copyToClipboard(url)
             toast({ title: 'Link de anamnese copiado!' })
           }}><Stethoscope className="w-4 h-4 mr-1" /> Anamnese</Button>
           <Button variant="outline" size="sm" onClick={() => setWhatsappOpen(true)}><MessageCircle className="w-4 h-4 mr-1" /> WhatsApp</Button>
@@ -243,7 +243,7 @@ export default function ClientDetail({ clientId, onBack, onEdit }: { clientId: s
                   <p>Nenhuma anamnese registrada para esta cliente.</p>
                   <Button variant="outline" size="sm" className="mt-4" onClick={() => {
                     const url = `${window.location.origin}/anamnese/${c.id}`
-                    navigator.clipboard.writeText(url)
+                    copyToClipboard(url)
                     toast({ title: 'Link copiado!' })
                   }}>Copiar link do questionário</Button>
                 </div>
@@ -447,4 +447,18 @@ function WhatsappDialog({ open, onOpenChange, onSend }: any) {
       </DialogContent>
     </Dialog>
   )
+}
+
+function copyToClipboard(text: string) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+  } else {
+    const textArea = document.createElement("textarea")
+    textArea.value = text
+    textArea.style.position = "absolute"
+    textArea.style.left = "-999999px"
+    document.body.prepend(textArea)
+    textArea.select()
+    try { document.execCommand('copy') } catch (error) { console.error(error) } finally { textArea.remove() }
+  }
 }
