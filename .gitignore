@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+
+# next
+.next/
+out/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# database
+db/
+*.db
+*.db-journal
+
+# logs & caches
+dev.log
+server.log
+*.log
+tsconfig.tsbuildinfo
+
+# os / ide
+.DS_Store
+.idea/
+.vscode/
+
+# local / scratch
+Obsidian/
+agent-ctx/
+download/
+seed_admin.ts
+scratch_*.ts
+test-prisma.js

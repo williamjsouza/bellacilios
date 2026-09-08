@@ -1,0 +1,625 @@
+// ERP Clínica de Estética & Lash Designer — Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTENTICAÇÃO & RBAC ============
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("recepcionista") // admin | gestor | recepcionista | profissional | financeiro
+  professional String?  // link opcional ao profissional
+  active       Boolean  @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs AuditLog[]
+  cashOps   CashMovement[] @relation("CashOperator")
+}
+
+model Setting {
+  id    String @id
+  value String
+}
+
+// ============ PROFISSIONAIS ============
+
+model Professional {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  whatsapp     String?
+  role         String   @default("Lash Designer") // cargo
+  specialties  String   @default("") // categorias separadas por vírgula
+  color        String   @default("#c084fc") // cor na agenda
+  workStart    String   @default("09:00")
+  workEnd      String   @default("18:00")
+  workDays     String   @default("1,2,3,4,5,6") // dias da semana
+  commission   Float    @default(40) // % padrão
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  appointments    Appointment[]   @relation("ApptProfessional")
+  procedures      Procedure[]     @relation("ProcProfessional")
+  serviceProf     ServiceProfessional[]
+  commissions     Commission[]
+}
+
+// ============ CLIENTES / CRM ============
+
+model Client {
+  id                String    @id @default(cuid())
+  name              String
+  socialName        String?
+  cpf               String?
+  rg                String?
+  birthDate         DateTime?
+  gender            String?   // F | M | Outro
+  phone             String?
+  whatsapp          String?
+  email             String?
+  cep               String?
+  address           String?
+  city              String?
+  state             String?
+  instagram         String?
+  profession        String?
+  source            String?   // como conheceu
+  observations      String?
+  // Dados de estética
+  skinType          String?
+  sensitivity       String?
+  allergies         String?
+  restrictions      String?
+  preferences       String?
+  contraindications String?
+  profObservations  String?
+  // Lash - avaliação inicial
+  eyeShape          String?
+  lashType          String?
+  lashThickness     String?
+  lashCurvature     String?
+  lashDensity       String?
+  lashLength        String?
+  lashSensitivity   String?
+  lashAllergies     String?
+  lashIrritations   String?
+  lashObservations  String?
+  // CRM
+  classification    String    @default("Nova") // Nova | Ativa | Frequente | VIP | Inativa | Perdida
+  responsible       String?   // profissional responsável
+  firstVisit        DateTime?
+  lastVisit         DateTime?
+  totalVisits       Int       @default(0)
+  totalSpent        Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  appointments  Appointment[]
+  procedures    Procedure[]
+  photos        ClientPhoto[]
+  quotes        Quote[]
+  sales         Sale[]
+  receivables   AccountReceivable[]
+  whatsappMsgs  WhatsappMessage[]
+  documents     ClientDocument[]
+  lashMappings  LashMapping[]
+  anamnesis     ClientAnamnesis?
+}
+
+model ClientPhoto {
+  id          String   @id @default(cuid())
+  clientId    String
+  category    String   // antes | durante | depois | evolucao | resultado | referencia
+  url         String   // base64 data url
+  procedureId String?
+  professional String?
+  observation String?
+  takenAt     DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  procedure Procedure? @relation(fields: [procedureId], references: [id])
+}
+
+model ClientDocument {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  url       String
+  type      String
+  createdAt DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+// ============ SERVIÇOS ============
+
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  icon        String?
+  color       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  services Service[]
+}
+
+model Service {
+  id              String   @id @default(cuid())
+  code            String?
+  name            String
+  categoryId      String?
+  description     String?
+  duration        Int      @default(60) // minutos
+  price           Float    @default(0)
+  promoPrice      Float?
+  commissionPct   Float    @default(40)
+  maintenanceDays Int?     // intervalo recomendado p/ manutenção
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  category     ServiceCategory?     @relation(fields: [categoryId], references: [id])
+  professionals ServiceProfessional[]
+  appointments  Appointment[]
+  procedures    Procedure[]
+  quotes        QuoteItem[]
+  saleItems     SaleItem[]
+  consumption   ServiceProductConsumption[]
+  prices        ServicePrice[]
+  postCare      PostCareConfig[]
+}
+
+model ServiceProfessional {
+  id            String @id @default(cuid())
+  serviceId     String
+  professionalId String
+  Service       Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  Professional  Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+}
+
+model ServicePrice {
+  id         String @id @default(cuid())
+  serviceId  String
+  tableName  String // Normal | VIP | Promoção
+  price      Float
+  active     Boolean @default(true)
+  createdAt  DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
+
+model ServiceProductConsumption {
+  id         String @id @default(cuid())
+  serviceId  String
+  productId  String
+  quantity   Float
+  unit       String @default("un")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model PostCareConfig {
+  id        String @id @default(cuid())
+  serviceId String
+  dayOffset Int    // D+1, D+7...
+  template  String // chave do template de mensagem
+  active    Boolean @default(true)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
+
+// ============ AGENDA ============
+
+model Appointment {
+  id            String   @id @default(cuid())
+  clientId      String
+  professionalId String
+  serviceId     String
+  date          DateTime
+  startTime     String   // HH:mm
+  endTime       String   // HH:mm
+  duration      Int      // minutos
+  price         Float    @default(0)
+  status        String   @default("agendado") // agendado | confirmado | em_atendimento | finalizado | cancelado | nao_compareceu | reagendado
+  observation   String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  professional Professional @relation("ApptProfessional", fields: [professionalId], references: [id])
+  service     Service      @relation(fields: [serviceId], references: [id])
+  procedure   Procedure?
+}
+
+// ============ CÍLIOS / PROCEDIMENTOS ============
+
+model Procedure {
+  id            String   @id @default(cuid())
+  clientId      String
+  professionalId String
+  serviceId     String?
+  appointmentId String?  @unique
+  date          DateTime @default(now())
+  technique     String?  // fio_a_fio | volume_brasileiro | volume_russo | etc
+  mapping       String?  // json do mapping
+  curvature     String?
+  thickness     String?
+  lengths       String?  // ex: "8|9|10|11|12|11|10|9"
+  effect        String?
+  glue          String?
+  glueLot       String?
+  duration      Int?     // minutos
+  observation   String?
+  reactions     String?
+  recommendations String?
+  nextMaintenance DateTime?
+  nextMaintenanceDays Int?
+  status        String   @default("finalizado") // em_andamento | finalizado
+  satisfaction  Int?     // 1-5
+  createdAt     DateTime @default(now())
+
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  professional Professional @relation("ProcProfessional", fields: [professionalId], references: [id])
+  service     Service?     @relation(fields: [serviceId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  photos      ClientPhoto[]
+  consumptions ProcedureConsumption[]
+}
+
+model ProcedureConsumption {
+  id          String @id @default(cuid())
+  procedureId String
+  productId   String
+  quantity    Float
+  lot         String?
+
+  procedure Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+}
+
+model LashMapping {
+  id          String   @id @default(cuid())
+  clientId    String
+  name        String   @default("Padrão")
+  leftEye     String   // json: ["8","9","10",...]
+  rightEye    String   // json
+  curvature   String?
+  thickness   String?
+  technique   String?
+  effect      String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+// ============ ESTOQUE ============
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  companyName String
+  tradeName String?
+  cnpj      String?
+  cpf       String?
+  phone     String?
+  whatsapp  String?
+  email     String?
+  address   String?
+  contact   String?
+  observations String?
+  createdAt DateTime @default(now())
+
+  products Product[]
+  payables AccountPayable[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  code         String?
+  barcode      String?
+  name         String
+  categoryId   String?
+  supplierId   String?
+  brand        String?
+  unit         String   @default("un")
+  lot          String?
+  expiryDate   DateTime?
+  cost         Float    @default(0)
+  price        Float    @default(0)
+  stock        Float    @default(0)
+  minStock     Float    @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category    ProductCategory? @relation(fields: [categoryId], references: [id])
+  supplier    Supplier?        @relation(fields: [supplierId], references: [id])
+  movements   StockMovement[]
+  serviceConsumption ServiceProductConsumption[]
+  procedureConsumption ProcedureConsumption[]
+  saleItems   SaleItem[]
+}
+
+model StockMovement {
+  id         String   @id @default(cuid())
+  productId  String
+  type       String   // entrada | saida | ajuste | perda | vencimento | consumo
+  quantity   Float
+  reason     String?
+  refType    String?  // appointment | procedure | purchase | manual
+  refId      String?
+  createdAt  DateTime @default(now())
+  createdBy  String?
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+// ============ ORÇAMENTOS & VENDAS ============
+
+model Quote {
+  id          String    @id @default(cuid())
+  clientId    String
+  professionalId String?
+  date        DateTime  @default(now())
+  validUntil  DateTime?
+  discount    Float     @default(0)
+  addition    Float     @default(0)
+  total       Float     @default(0)
+  observations String?
+  status      String    @default("rascunho") // rascunho | enviado | aprovado | recusado | expirado | cancelado
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  client Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items  QuoteItem[]
+}
+
+model QuoteItem {
+  id        String @id @default(cuid())
+  quoteId   String
+  serviceId String?
+  productId String?
+  description String
+  quantity  Float  @default(1)
+  unitPrice Float  @default(0)
+  total     Float  @default(0)
+
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id])
+}
+
+model Sale {
+  id         String   @id @default(cuid())
+  clientId   String
+  date       DateTime @default(now())
+  subtotal   Float    @default(0)
+  discount   Float    @default(0)
+  total      Float    @default(0)
+  status     String   @default("paga") // aberta | paga | cancelada
+  observations String?
+  createdAt  DateTime @default(now())
+
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items       SaleItem[]
+  payments    Payment[]
+  receivables AccountReceivable[]
+}
+
+model SaleItem {
+  id        String @id @default(cuid())
+  saleId    String
+  serviceId String?
+  productId String?
+  description String
+  quantity  Float  @default(1)
+  unitPrice Float  @default(0)
+  total     Float  @default(0)
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  saleId    String
+  method    String   // dinheiro | pix | credito | debito | transferencia | boleto | outro
+  amount    Float
+  createdAt DateTime @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+}
+
+// ============ FINANCEIRO ============
+
+model AccountReceivable {
+  id          String    @id @default(cuid())
+  clientId    String?
+  saleId      String?
+  description String
+  amount      Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  method      String?
+  status      String    @default("aberta") // aberta | paga | vencida
+  createdAt   DateTime  @default(now())
+
+  client Client? @relation(fields: [clientId], references: [id])
+  sale   Sale?   @relation(fields: [saleId], references: [id])
+}
+
+model AccountPayable {
+  id          String    @id @default(cuid())
+  supplierId  String?
+  category    String    // aluguel | energia | produtos | salarios | marketing | impostos | etc
+  description String
+  amount      Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  method      String?
+  status      String    @default("aberta")
+  costCenter  String?
+  createdAt   DateTime  @default(now())
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+}
+
+model CashRegister {
+  id         String    @id @default(cuid())
+  openedAt   DateTime  @default(now())
+  closedAt   DateTime?
+  openingAmount Float  @default(0)
+  closingAmount Float?
+  difference Float?
+  status     String    @default("aberto") // aberto | fechado
+  notes      String?
+  createdBy  String?
+
+  movements CashMovement[]
+}
+
+model CashMovement {
+  id         String   @id @default(cuid())
+  cashId     String
+  type       String   // entrada | saida | sangria | suprimento
+  amount     Float
+  method     String   // dinheiro | pix | cartao
+  description String?
+  createdAt  DateTime @default(now())
+  operatorId String?
+
+  cash     CashRegister @relation(fields: [cashId], references: [id])
+  operator User?        @relation("CashOperator", fields: [operatorId], references: [id])
+}
+
+model Commission {
+  id             String   @id @default(cuid())
+  professionalId String
+  procedureId    String?
+  saleId         String?
+  amount         Float
+  percentage     Float
+  status         String   @default("aberta") // aberta | paga
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+}
+
+// ============ WHATSAPP / COMUNICAÇÃO ============
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique // agendamento | confirmacao | lembrete | aniversario | pos_atendimento | manutencao | cliente_inativa | satisfacao
+  name      String
+  content   String   // usa {{nome}} {{data}} {{hora}} {{profissional}} {{empresa}} etc
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WhatsappMessage {
+  id        String   @id @default(cuid())
+  clientId  String?
+  to        String
+  template  String?
+  content   String
+  status    String   @default("queued") // queued | sending | sent | delivered | read | error
+  type      String   @default("manual") // manual | agendamento | lembrete | aniversario | manutencao
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+
+  client Client? @relation(fields: [clientId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // manutencao | aniversario | estoque | conta | inativa | agendamento
+  title     String
+  message   String
+  refType   String?
+  refId     String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ============ AUDITORIA ============
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   // create | update | delete | login | logout
+  entity    String
+  entityId  String?
+  oldValue  String?
+  newValue  String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+// ============ ANAMNESE ============
+
+model ClientAnamnesis {
+  id String @id @default(cuid())
+  clientId String @unique
+  
+  // Health
+  hadExtensionBefore Boolean @default(false)
+  timeWithoutExtension String?
+  previousReactions String?
+  wearingMakeup Boolean @default(false)
+  hasAllergies Boolean @default(false)
+  thyroidProblem Boolean @default(false)
+  sleepingSide String?
+  recentEyeProcedure Boolean @default(false)
+  pregnantOrNursing Boolean @default(false)
+  oncologicalTreatment Boolean @default(false)
+  skinDisease Boolean @default(false)
+  healthTreatment Boolean @default(false)
+  usingMedication Boolean @default(false)
+  blepharitis Boolean @default(false)
+  
+  // Preferences
+  wantsLongLashes Boolean @default(false)
+  wantsCurvedLashes Boolean @default(false)
+  expectedResult String?
+  eyeStylePreference String?
+  
+  // Consent
+  photoAuthorization Boolean @default(false)
+  termsAccepted Boolean @default(false)
+  termsAcceptedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
