@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, errorResponse } from '@/lib/session'
+import { hashPassword } from '@/lib/auth-hash'
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,9 +35,7 @@ export async function POST(req: NextRequest) {
     if (id) {
       const dataToUpdate: any = { name, email, role, active }
       if (password) {
-        // Here you'd hash the password in a real app, e.g. using bcrypt
-        // dataToUpdate.passwordHash = await hash(password, 10)
-        dataToUpdate.passwordHash = password // placeholder for simplified logic
+        dataToUpdate.passwordHash = hashPassword(password)
       }
       dbUser = await db.user.update({ where: { id }, data: dataToUpdate })
       await db.auditLog.create({ data: { userId: user.id, action: 'update', entity: 'user', entityId: id } })
@@ -45,7 +44,7 @@ export async function POST(req: NextRequest) {
         data: {
           name,
           email,
-          passwordHash: password || '123456',
+          passwordHash: hashPassword(password || '123456'),
           role: role || 'recepcionista',
           active: active !== false
         }
