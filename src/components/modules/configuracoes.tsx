@@ -75,6 +75,9 @@ function WhatsappTab() {
   const { data, reload } = useFetch<any>('/api/settings')
   const { toast } = useToast()
   const [form, setForm] = useState<any>({})
+  const [testPhone, setTestPhone] = useState('')
+  const [testing, setTesting] = useState(false)
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(data?.settings ?? {})
@@ -84,6 +87,28 @@ function WhatsappTab() {
   const save = async () => {
     await apiPost('/api/settings', { settings: { whatsappProvider: form.whatsappProvider ?? 'none', whatsappApiUrl: form.whatsappApiUrl ?? '', whatsappApiKey: form.whatsappApiKey ?? '', whatsappInstance: form.whatsappInstance ?? '' } })
     toast({ title: 'Configurações salvas' }); reload()
+  }
+
+  const testConnection = async () => {
+    if (!testPhone || !form.whatsappApiUrl || !form.whatsappApiKey || !form.whatsappInstance) {
+      toast({ title: 'Preencha todos os campos e o telefone de teste', variant: 'destructive' })
+      return
+    }
+    setTesting(true)
+    try {
+      const res = await apiPost('/api/whatsapp/test', {
+        url: form.whatsappApiUrl,
+        apiKey: form.whatsappApiKey,
+        instance: form.whatsappInstance,
+        phone: testPhone
+      })
+      if (res.error) throw new Error(res.error)
+      toast({ title: 'Conexão bem sucedida!', description: 'Mensagem de teste enviada.' })
+    } catch (e: any) {
+      toast({ title: 'Erro no teste', description: e.message, variant: 'destructive' })
+    } finally {
+      setTesting(false)
+    }
   }
 
   return (
@@ -102,6 +127,22 @@ function WhatsappTab() {
         <Field label="Chave da API"><Input type="password" value={form.whatsappApiKey ?? ''} onChange={(e) => set('whatsappApiKey', e.target.value)} /></Field>
         <Field label="Instância"><Input value={form.whatsappInstance ?? ''} onChange={(e) => set('whatsappInstance', e.target.value)} /></Field>
         <Button onClick={save}><Save className="w-4 h-4 mr-1" /> Salvar</Button>
+        
+        {form.whatsappProvider === 'evolution' && (
+          <div className="pt-4 border-t mt-4 space-y-3">
+            <h4 className="font-medium text-sm">Teste de Conexão</h4>
+            <div className="flex gap-2">
+              <Input 
+                placeholder="Número WhatsApp (ex: 5511999999999)" 
+                value={testPhone} 
+                onChange={(e) => setTestPhone(e.target.value)}
+              />
+              <Button variant="secondary" onClick={testConnection} disabled={testing}>
+                {testing ? 'Testando...' : 'Testar Conexão'}
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
