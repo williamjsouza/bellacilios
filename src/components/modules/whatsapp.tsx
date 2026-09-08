@@ -128,7 +128,7 @@ function MessagesTab() {
             </div>
             <div className="space-y-1.5">
               <Label>Template</Label>
-              <Select value={templateKey} onValueChange={onTemplateChange}>
+              <Select value={templateKey || undefined} onValueChange={onTemplateChange}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>{(tplData?.templates ?? []).map((t:any) => <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
