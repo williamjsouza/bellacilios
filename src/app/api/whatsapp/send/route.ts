@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             number: cleanPhone,
             options: { delay: 1200, presence: "composing" },
-            textMessage: { text: rendered }
+            text: rendered
           })
         })
 
